@@ -70,11 +70,11 @@
 
 - (BOOL) isSystemUrl:(NSURL*)url
 {
-	if ([[url host] isEqualToString:@"itunes.apple.com"]) {
-		return YES;
-	}
+    if ([[url host] isEqualToString:@"itunes.apple.com"]) {
+        return YES;
+    }
 
-	return NO;
+    return NO;
 }
 
 - (void)open:(CDVInvokedUrlCommand*)command
@@ -229,7 +229,7 @@
     _previousStatusBarStyle = [UIApplication sharedApplication].statusBarStyle;
 
     __block CDVInAppBrowserNavigationController* nav = [[CDVInAppBrowserNavigationController alloc]
-                                   initWithRootViewController:self.inAppBrowserViewController];
+                                                        initWithRootViewController:self.inAppBrowserViewController];
     nav.orientationDelegate = self.inAppBrowserViewController;
     nav.navigationBarHidden = YES;
     nav.modalPresentationStyle = self.inAppBrowserViewController.modalPresentationStyle;
@@ -511,6 +511,8 @@
 @implementation CDVInAppBrowserViewController
 
 @synthesize currentURL;
+@synthesize navBar;
+@synthesize navItem;
 
 - (id)initWithUserAgent:(NSString*)userAgent prevUserAgent:(NSString*)prevUserAgent browserOptions: (CDVInAppBrowserOptions*) browserOptions
 {
@@ -533,7 +535,7 @@
 
 // Prevent crashes on closing windows
 -(void)dealloc {
-   self.webView.delegate = nil;
+    self.webView.delegate = nil;
 }
 
 - (void)createViews
@@ -542,7 +544,9 @@
 
     CGRect webViewBounds = self.view.bounds;
     BOOL toolbarIsAtBottom = ![_browserOptions.toolbarposition isEqualToString:kInAppBrowserToolbarBarPositionTop];
-    webViewBounds.size.height -= _browserOptions.location ? FOOTER_HEIGHT : TOOLBAR_HEIGHT;
+    //webViewBounds.size.height -= _browserOptions.location ? FOOTER_HEIGHT : TOOLBAR_HEIGHT;
+    webViewBounds.size.height -= TOOLBAR_HEIGHT;
+    webViewBounds.origin.y = TOOLBAR_HEIGHT;
     self.webView = [[UIWebView alloc] initWithFrame:webViewBounds];
 
     self.webView.autoresizingMask = (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight);
@@ -644,10 +648,40 @@
 
     [self.toolbar setItems:@[self.closeButton, flexibleSpaceButton, self.backButton, fixedSpaceButton, self.forwardButton]];
 
-    self.view.backgroundColor = [UIColor grayColor];
-    [self.view addSubview:self.toolbar];
-    [self.view addSubview:self.addressLabel];
+    self.view.backgroundColor = [UIColor clearColor];
+    [self.view addSubview:[self buildNavigationBar]];
     [self.view addSubview:self.spinner];
+}
+
+
+- (UINavigationBar *)buildNavigationBar {
+    self.navBar = [[UINavigationBar alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, 64)];
+    [self.navBar setBarStyle:UIBarStyleBlack];
+    [self.navBar setTranslucent:YES];
+    self.navItem = [[UINavigationItem alloc] initWithTitle:@"加载中..."];
+    NSDictionary * navBarTitleTextAttributes = @{ NSForegroundColorAttributeName : [UIColor whiteColor]};
+    UIImage *backImage = [UIImage imageNamed:@"back-ios"];
+    NSString *buttonTitleStr = @" 返回";
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+    [button setBackgroundColor:[UIColor clearColor]];
+    [button setImage:backImage forState:UIControlStateNormal];
+    [button setTitle:buttonTitleStr forState:UIControlStateNormal];
+    [button setTintColor:[UIColor whiteColor]];
+    button.titleLabel.font = [UIFont systemFontOfSize:15];
+    [button addTarget:self action:@selector(close) forControlEvents:UIControlEventTouchUpInside];
+    CGSize buttonTitleLabelSize = [buttonTitleStr sizeWithAttributes:@{NSFontAttributeName:button.titleLabel.font}]; //文本尺寸
+    CGSize buttonImageSize = backImage.size;
+    button.frame = CGRectMake(0,0,
+                              buttonImageSize.width + buttonTitleLabelSize.width,
+                              buttonImageSize.height);
+    UIBarButtonItem *leftBtn = [[UIBarButtonItem alloc] initWithCustomView:button];
+    //    UIBarButtonItem *leftBtn = [[UIBarButtonItem alloc] initWithImage:backImage style:UIBarButtonItemStylePlain target:self action:@selector(close)];
+    [leftBtn setTintColor:[UIColor whiteColor]];
+    [self.navItem setLeftBarButtonItems:[NSArray arrayWithObjects:leftBtn, nil]];
+    [self.navBar setItems:[NSArray arrayWithObject:self.navItem]];
+    [self.navBar setTitleTextAttributes:navBarTitleTextAttributes];
+    [self.navBar setClipsToBounds:true];
+    return self.navBar;
 }
 
 - (void) setWebViewFrame : (CGRect) frame {
@@ -795,7 +829,7 @@
 
 - (UIStatusBarStyle)preferredStatusBarStyle
 {
-    return UIStatusBarStyleDefault;
+    return UIStatusBarStyleLightContent;
 }
 
 - (BOOL)prefersStatusBarHidden {
@@ -909,6 +943,50 @@
     self.addressLabel.text = [self.currentURL absoluteString];
     self.backButton.enabled = theWebView.canGoBack;
     self.forwardButton.enabled = theWebView.canGoForward;
+
+    NSString *text = [self.webView stringByEvaluatingJavaScriptFromString:@"document.title"];
+    if (text != nil && ![@"" isEqualToString:text]) {
+        [self.navItem setTitle:text];
+    } else {
+        [self.navItem setTitle:[self.currentURL absoluteString]];
+    }
+
+    UIImage *backImage = [UIImage imageNamed:@"back-ios"];
+    NSString *buttonTitleStr = @" 返回";
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+    button.titleLabel.font = [UIFont systemFontOfSize:15];
+    [button setBackgroundColor:[UIColor clearColor]];
+    [button setImage:backImage forState:UIControlStateNormal];
+    [button setTitle:buttonTitleStr forState:UIControlStateNormal];
+    [button setTintColor:[UIColor whiteColor]];
+    if (theWebView.canGoBack) {
+        [button addTarget:self action:@selector(goBack:) forControlEvents:UIControlEventTouchUpInside];
+    } else {
+        [button addTarget:self action:@selector(close) forControlEvents:UIControlEventTouchUpInside];
+    }
+    CGSize buttonTitleLabelSize = [buttonTitleStr sizeWithAttributes:@{NSFontAttributeName:button.titleLabel.font}]; //文本尺寸
+    CGSize buttonImageSize = backImage.size;
+    button.frame = CGRectMake(0,0,
+                              buttonImageSize.width + buttonTitleLabelSize.width,
+                              buttonImageSize.height);
+    UIBarButtonItem *leftBtn = [[UIBarButtonItem alloc] initWithCustomView:button];
+    [leftBtn setTintColor:[UIColor whiteColor]];
+
+    UIBarButtonItem *leftBtn2 = [[UIBarButtonItem alloc] initWithTitle:@"关闭" style:UIBarButtonItemStylePlain target:self action:@selector(close)];
+    [leftBtn2 setTintColor:[UIColor whiteColor]];
+    UIFont* font = [UIFont systemFontOfSize:15];
+    NSDictionary* dic = @{NSFontAttributeName:font};
+    [leftBtn2 setTitleTextAttributes:dic forState:UIControlStateNormal];
+    NSArray *items;
+    if (theWebView.canGoBack) {
+        items = [NSArray arrayWithObjects:leftBtn, leftBtn2, nil];
+    } else {
+        items = [NSArray arrayWithObjects:leftBtn, nil];
+    }
+
+    [self.navItem setLeftBarButtonItems: items];
+
+
 
     [self.spinner stopAnimating];
 
@@ -1049,15 +1127,14 @@
 
 - (void) viewDidLoad {
 
-    CGRect statusBarFrame = [self invertFrameIfNeeded:[UIApplication sharedApplication].statusBarFrame];
-    statusBarFrame.size.height = STATUSBAR_HEIGHT;
-    // simplified from: http://stackoverflow.com/a/25669695/219684
-
-    UIToolbar* bgToolbar = [[UIToolbar alloc] initWithFrame:statusBarFrame];
-    bgToolbar.barStyle = UIBarStyleDefault;
-    [bgToolbar setAutoresizingMask:UIViewAutoresizingFlexibleWidth];
-    [self.view addSubview:bgToolbar];
-
+//    CGRect statusBarFrame = [self invertFrameIfNeeded:[UIApplication sharedApplication].statusBarFrame];
+//    statusBarFrame.size.height = STATUSBAR_HEIGHT;
+//    // simplified from: http://stackoverflow.com/a/25669695/219684
+//
+//    UIToolbar* bgToolbar = [[UIToolbar alloc] initWithFrame:statusBarFrame];
+//    bgToolbar.barStyle = UIBarStyleDefault;
+//    [bgToolbar setAutoresizingMask:UIViewAutoresizingFlexibleWidth];
+//    [self.view addSubview:bgToolbar];
     [super viewDidLoad];
 }
 
@@ -1104,4 +1181,3 @@
 
 
 @end
-
