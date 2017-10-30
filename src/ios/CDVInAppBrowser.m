@@ -28,6 +28,20 @@
 #define    kInAppBrowserToolbarBarPositionBottom @"bottom"
 #define    kInAppBrowserToolbarBarPositionTop @"top"
 
+#define    CC_ScreenWidth   [UIScreen mainScreen].bounds.size.width
+#define    CC_ScreenHeight  [UIScreen mainScreen].bounds.size.height
+#define    IS_iPhoneX (CC_ScreenWidth == 375.f && CC_ScreenHeight == 812.f ? YES : NO)
+#define    IS_11 (IsAtLeastiOSVersion(@"11.0"))
+#define    CC_NavigationBarHeight  44.f
+#define    CC_StatusBarHeight (IS_iPhoneX ? 44.f : 20.f)
+//ios11之前view webview距离顶部的高度为44, navbar的frame为0,0,screen_width, 64
+//ios11之后view
+//1 .如果不是iphonex webview距离顶部的距离为44+CC_StatusBarHeight, navbar的fame为0, 20, screen_width, 44
+//2. 如果是iphonex webview距离顶部的距离为44+CC_StatusBarHeight, navbar的frmae为0, 40, screen_width, 44
+#define    TOP_NAV (IS_11 ? CC_StatusBarHeight : 0)
+#define    TOP_WEBVIEW (IS_11 ? CC_NavigationBarHeight + CC_StatusBarHeight : CC_NavigationBarHeight)
+#define    CC_NavBarHeight (IS_11 ? CC_NavigationBarHeight : CC_NavigationBarHeight + CC_StatusBarHeight)
+
 #define    TOOLBAR_HEIGHT 44.0
 #define    STATUSBAR_HEIGHT 20.0
 #define    LOCATIONBAR_HEIGHT 21.0
@@ -545,8 +559,8 @@
     CGRect webViewBounds = self.view.bounds;
     BOOL toolbarIsAtBottom = ![_browserOptions.toolbarposition isEqualToString:kInAppBrowserToolbarBarPositionTop];
     //webViewBounds.size.height -= _browserOptions.location ? FOOTER_HEIGHT : TOOLBAR_HEIGHT;
-    webViewBounds.size.height -= TOOLBAR_HEIGHT;
-    webViewBounds.origin.y = TOOLBAR_HEIGHT;
+    webViewBounds.size.height -= TOP_WEBVIEW;
+    webViewBounds.origin.y = TOP_WEBVIEW;
     self.webView = [[UIWebView alloc] initWithFrame:webViewBounds];
 
     self.webView.autoresizingMask = (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight);
@@ -655,8 +669,8 @@
 
 
 - (UINavigationBar *)buildNavigationBar {
-    self.navBar = [[UINavigationBar alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, 64)];
-    [self.navBar setBarStyle:UIBarStyleBlack];
+    self.navBar = [[UINavigationBar alloc] initWithFrame:CGRectMake(0, TOP_NAV, self.view.frame.size.width, CC_NavBarHeight)];
+    [self.navBar setBarTintColor:[UIColor colorWithRed:0.13 green:0.13 blue:0.13 alpha:1.00]];
     [self.navBar setTranslucent:YES];
     self.navItem = [[UINavigationItem alloc] initWithTitle:@"加载中..."];
     NSDictionary * navBarTitleTextAttributes = @{ NSForegroundColorAttributeName : [UIColor whiteColor]};
